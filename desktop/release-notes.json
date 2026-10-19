@@ -1,5 +1,18 @@
 [
   {
+    "version": "22.7.53",
+    "date": "2026-10-19",
+    "sections": [
+      {
+        "title": "Protected update downloads",
+        "notes": [
+          "Sign in with shaedy-auth to authorize desktop update checks and downloads.",
+          "Update download access expires automatically and stops when its account session is revoked."
+        ]
+      }
+    ]
+  },
+  {
     "version": "22.7.52",
     "date": "2026-10-19",
     "sections": [

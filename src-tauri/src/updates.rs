@@ -1,5 +1,8 @@
 use serde::{Deserialize, Serialize};
-use std::{sync::Mutex, time::Duration};
+use std::{
+    sync::Mutex,
+    time::{Duration, Instant},
+};
 use tauri::{Manager, WebviewWindow};
 use tauri_plugin_updater::{Update, UpdaterExt};
 
@@ -54,10 +57,14 @@ pub struct Session {
     downloaded: u64,
     total: Option<u64>,
     error: Option<&'static str>,
+    authorization_expires: Option<Instant>,
 }
 impl Session {
     pub fn busy(&self) -> bool {
-        matches!(self.phase, "checking" | "downloading" | "installing")
+        matches!(
+            self.phase,
+            "authorizing" | "checking" | "downloading" | "installing"
+        )
     }
     pub fn installing(&self) -> bool {
         self.phase == "installing"
@@ -152,11 +159,20 @@ pub async fn check_update(
             return Err("An update operation is already running".into());
         }
         *s = Session {
-            phase: "checking",
+            phase: "authorizing",
             ..Default::default()
         };
     }
     let result = async {
+        let authorization = crate::release_auth::authorize().await?;
+        {
+            let mut s = state
+                .session
+                .lock()
+                .map_err(|_| "Desktop state unavailable")?;
+            s.phase = "checking";
+            s.authorization_expires = Some(authorization.expires_at);
+        }
         window
             .app_handle()
             .updater_builder()
@@ -169,14 +185,20 @@ pub async fn check_update(
                 .map_err(|_| "Invalid update channel")?])
             .map_err(|_| "Invalid update channel")?
             .pubkey(state.channel.public_key.as_ref().unwrap())
+            .header("Authorization", authorization.header)
+            .map_err(|_| "Update authorization unavailable")?
             .timeout(Duration::from_secs(30))
-            .configure_client(|client| client.https_only(true))
+            .configure_client(|client| {
+                client
+                    .https_only(true)
+                    .redirect(reqwest::redirect::Policy::none())
+            })
             .restart_after_install(true)
             .build()
             .map_err(|_| "Update service unavailable")?
             .check()
             .await
-            .map_err(|_| "Update check failed. Check your connection and try again.")
+            .map_err(|_| "Update check failed. Check your connection or sign in again.")
     }
     .await;
     match result {
@@ -219,6 +241,14 @@ pub async fn download_update(
         if s.phase != "available" {
             return Err("Check for an update first".into());
         }
+        if s.authorization_expires
+            .is_none_or(|expiry| Instant::now() >= expiry)
+        {
+            s.phase = "error";
+            s.error = Some("Update permission expired. Check again to sign in.");
+            s.update = None;
+            return Err("Update permission expired. Check again to sign in.".into());
+        }
         let u = s.update.clone().ok_or("No update available")?;
         s.phase = "downloading";
         s.downloaded = 0;
@@ -248,7 +278,7 @@ pub async fn download_update(
         }
         Err(_) => failed(
             &state,
-            "Download or signature validation failed. Nothing was installed.",
+            "Download permission, connection or signature validation failed. Check again to sign in. Nothing was installed.",
         ),
     }
 }
@@ -341,7 +371,7 @@ mod tests {
     }
     #[test]
     fn operations_are_serialized_and_only_installation_blocks_game_navigation() {
-        for phase in ["checking", "downloading", "installing"] {
+        for phase in ["authorizing", "checking", "downloading", "installing"] {
             assert!(Session {
                 phase,
                 ..Default::default()

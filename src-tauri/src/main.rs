@@ -2,6 +2,7 @@
 
 mod diagnostics;
 mod navigation;
+mod release_auth;
 mod shortcuts;
 mod updates;
 #[cfg(windows)]

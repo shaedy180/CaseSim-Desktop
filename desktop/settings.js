@@ -5,9 +5,9 @@ let pending = false;
 async function refresh() {
   const s = await invoke('desktop_status');
   byId('version').textContent = `Desktop ${s.version} · Web version follows the online game`;
-  const labels = { checking: 'Checking the signed update channel…', available: `Desktop ${s.availableVersion} is available.`, downloading: `Downloading: ${(s.downloaded / 1048576).toFixed(1)} MB`, ready: `Desktop ${s.availableVersion} is verified and ready.`, current: 'Your desktop is up to date.', installing: 'Installing the verified update…', error: s.error };
+  const labels = { authorizing: 'Sign in and allow update downloads in your browser. Waiting up to five minutes…', checking: 'Checking the signed update channel…', available: `Desktop ${s.availableVersion} is available.`, downloading: `Downloading: ${(s.downloaded / 1048576).toFixed(1)} MB`, ready: `Desktop ${s.availableVersion} is verified and ready.`, current: 'Your desktop is up to date.', installing: 'Installing the verified update…', error: s.error };
   byId('status').textContent = s.configured ? (labels[s.phase] || 'Check for a new desktop version when you are ready.') : 'Updates are not configured in this preview.';
-  const busy = pending || ['checking', 'downloading', 'installing'].includes(s.phase);
+  const busy = pending || ['authorizing', 'checking', 'downloading', 'installing'].includes(s.phase);
   byId('check').disabled = busy || !s.configured;
   byId('download').hidden = s.phase !== 'available';
   byId('download').disabled = busy;
