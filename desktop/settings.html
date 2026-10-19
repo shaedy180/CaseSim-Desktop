@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="dark"><title>CaseSim Desktop</title><link rel="stylesheet" href="shell.css"><script src="settings.js" defer></script></head>
+<body class="controls"><main>
+  <div class="brand" aria-label="CaseSim">CASE<span>SIM</span><i aria-hidden="true"></i></div>
+  <div class="panel">
+    <h1>Desktop controls</h1>
+    <p id="version">Desktop version</p>
+    <div class="actions"><button data-action="game">Return to game</button><button class="secondary" data-action="account">Account and sign out</button></div>
+    <div class="actions"><button class="secondary" data-action="fullscreen">Fullscreen <kbd>F11</kbd></button><button class="secondary" data-action="zoom_reset">Reset zoom <kbd>Ctrl+0</kbd></button></div>
+    <h2>Desktop updates</h2>
+    <p id="status" role="status" aria-live="polite">Loading desktop status…</p>
+    <progress id="progress" hidden aria-label="Update download progress"></progress>
+    <div class="actions"><button id="check">Check for updates</button><button id="download" hidden>Download update</button><button id="install" hidden>Install and restart</button></div>
+    <p id="safety">Updates never restart an active game. Finish all openings and battles and stop Auto Open before leaving.</p>
+    <button class="secondary" data-action="leave_game">Leave game for maintenance</button>
+    <p id="error" role="alert"></p>
+    <button class="secondary" data-action="close_controls">Close controls</button>
+  </div>
+  <p class="footnote">DESKTOP CONTROLS <kbd>CTRL+SHIFT+D</kbd><br>ACCOUNT <kbd>CTRL+SHIFT+A</kbd> · GAME <kbd>CTRL+SHIFT+H</kbd></p>
+</main></body></html>

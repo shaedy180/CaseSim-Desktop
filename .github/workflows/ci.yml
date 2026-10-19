@@ -1,0 +1,207 @@
+name: CI
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+  checks: read
+
+concurrency:
+  group: desktop-windows-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  preflight:
+    if: github.event_name != 'push'
+    name: Desktop Linux preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      BUILD_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.BUILD_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Test release and provenance safeguards
+        run: npm test
+      - name: Validate independent release and security configuration
+        run: |
+          node .github/scripts/desktop-config.mjs
+      - name: Install native Linux check prerequisites
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+      - name: Install pinned Rust for Linux checks
+        run: |
+          toolchain=$(sed -n 's/^channel = "\(.*\)"/\1/p' src-tauri/rust-toolchain.toml)
+          rustup toolchain install "$toolchain" --profile minimal --component rustfmt --component clippy
+          rustup default "$toolchain"
+      - name: Cache Linux Rust checks
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: desktop-check-${{ runner.os }}-${{ hashFiles('src-tauri/rust-toolchain.toml', 'src-tauri/Cargo.lock') }}
+          restore-keys: desktop-check-${{ runner.os }}-
+      - name: Native formatting, unit, signature and lint checks on Linux
+        run: |
+          node scripts/desktop-licenses.mjs
+          cargo fmt --manifest-path src-tauri/Cargo.toml --check
+          cargo test --manifest-path src-tauri/Cargo.toml --locked
+          cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
+
+  windows:
+    needs: preflight
+    if: github.event_name != 'push'
+    name: Windows x64 preview
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      BUILD_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.BUILD_SHA }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked Node dependencies
+        run: npm ci
+      - name: Install pinned Rust toolchain
+        shell: pwsh
+        run: |
+          $toolchain = (Select-String '^channel = "([^"]+)"' src-tauri/rust-toolchain.toml).Matches.Groups[1].Value
+          rustup toolchain install $toolchain --profile minimal --component rustfmt --component clippy
+          rustup default $toolchain
+      - name: Restore Rust build cache
+        id: rust-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: desktop-${{ runner.os }}-${{ hashFiles('src-tauri/rust-toolchain.toml') }}-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: desktop-${{ runner.os }}-${{ hashFiles('src-tauri/rust-toolchain.toml') }}-
+      - name: Verify Windows build prerequisites
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe"
+          $installation = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (!$installation) { throw 'MSVC x64 build tools are required' }
+          rustc --version
+          cargo --version
+          npm run desktop:info
+      - name: Prepare Windows dependency attribution
+        run: npm run desktop:licenses
+      - name: Rust lint
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked --release --target x86_64-pc-windows-msvc -- -D warnings
+      - name: Build release NSIS installer
+        id: bundle
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force artifacts/desktop | Out-Null
+          npm run desktop:build 2>&1 | Tee-Object artifacts/desktop/build.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Configure test-only WebView2 debugging on the isolated runner
+        shell: pwsh
+        run: |
+          # Elevated WebView2 hosts intentionally ignore WEBVIEW2_* overrides.
+          # Scope the runner-only policy to this executable; ship no debug flags.
+          $policy = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments'
+          New-Item -Path $policy -Force | Out-Null
+          New-ItemProperty -Path $policy -Name 'CaseSim.exe' -Value '--remote-debugging-port=9222 --host-resolver-rules="MAP shaedy.de ~NOTFOUND, MAP auth.shaedy.de ~NOTFOUND"' -PropertyType String -Force | Out-Null
+      - name: Release WebView2 fixture smoke
+        run: node scripts/desktop-smoke.mjs
+      - name: Remove runner-only WebView2 policy
+        if: always()
+        shell: pwsh
+        run: Remove-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments' -Name 'CaseSim.exe' -ErrorAction SilentlyContinue
+      - name: Record exact source and installer integrity
+        shell: pwsh
+        run: |
+          $version = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
+          $installer = Get-Item -LiteralPath "src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/CaseSim_${version}_x64-setup.exe"
+          $sha = git rev-parse HEAD
+          if ($sha -ne $env:BUILD_SHA) { throw 'Build revision mismatch' }
+          Copy-Item -LiteralPath $installer.FullName -Destination artifacts/desktop/CaseSim-Desktop-Setup.exe
+          $hash = (Get-FileHash artifacts/desktop/CaseSim-Desktop-Setup.exe -Algorithm SHA256).Hash.ToLower()
+          @{ commit = $sha; version = $version; installer_sha256 = $hash; installer_bytes = $installer.Length; run = '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'; unsigned = $true } | ConvertTo-Json | Set-Content artifacts/desktop/build-info.json
+          "$hash  CaseSim-Desktop-Setup.exe" | Set-Content artifacts/desktop/SHA256SUMS.txt
+      - name: Upload unsigned public preview installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: CaseSim-Desktop-Windows-x64
+          path: |
+            artifacts/desktop/CaseSim-Desktop-Setup.exe
+            artifacts/desktop/build-info.json
+            artifacts/desktop/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload build and smoke diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: CaseSim-Desktop-Diagnostics-${{ github.run_id }}
+          path: |
+            artifacts/desktop/*.log
+            artifacts/desktop/*.png
+            artifacts/desktop/smoke-results.json
+            artifacts/desktop/runtime-metrics.json
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Save Rust build cache
+        if: always() && !cancelled() && steps.bundle.outcome == 'success' && steps.rust-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: ${{ steps.rust-cache.outputs.cache-primary-key }}
+
+  ci_provenance:
+    name: CI provenance
+    if: always()
+    needs: [preflight, windows]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with: {node-version: 24}
+      - run: node --test .github/scripts/ci-provenance.test.cjs
+      - name: Record PR validation or verify merged source
+        id: receipt
+        uses: actions/github-script@v8
+        env:
+          CI_JOB_RESULTS: ${{ toJSON(needs) }}
+          CI_REQUIRED_JOBS: '["preflight", "windows"]'
+        with:
+          script: |
+            await require('./.github/scripts/ci-provenance.cjs')({ github, context, core });
+      - name: Preserve successful PR validation receipt
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.receipt.outputs.artifact }}
+          path: ci-validation.json
+          if-no-files-found: error
+          retention-days: 90

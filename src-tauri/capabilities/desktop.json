@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "desktop",
+  "description": "Bundled desktop controls only; hosted game and auth pages have no native grants.",
+  "local": true,
+  "windows": ["desktop"],
+  "permissions": ["allow-desktop-action", "allow-desktop-status", "allow-check-update", "allow-download-update", "allow-install-update"]
+}
