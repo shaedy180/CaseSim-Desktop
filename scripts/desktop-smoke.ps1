@@ -22,6 +22,17 @@ public static class DesktopWindow {
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out Rect r);
   [DllImport("user32.dll")] public static extern int GetWindowLong(IntPtr h, int index);
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+  [StructLayout(LayoutKind.Sequential)] public struct KeyboardInput { public ushort Key, Scan; public uint Flags, Time; public UIntPtr Extra; }
+  [StructLayout(LayoutKind.Sequential)] public struct MouseInput { public int X, Y; public uint Data, Flags, Time; public UIntPtr Extra; }
+  [StructLayout(LayoutKind.Explicit)] public struct InputUnion { [FieldOffset(0)] public KeyboardInput Keyboard; [FieldOffset(0)] public MouseInput Mouse; }
+  [StructLayout(LayoutKind.Sequential)] public struct Input { public uint Type; public InputUnion Data; }
+  [DllImport("user32.dll", SetLastError = true)] public static extern uint SendInput(uint count, Input[] inputs, int size);
+  public static void Key(ushort key, bool up) {
+    var input = new Input { Type = 1, Data = new InputUnion { Keyboard = new KeyboardInput { Key = key, Flags = up ? 2u : 0u } } };
+    if (SendInput(1, new[] { input }, Marshal.SizeOf(typeof(Input))) != 1) throw new InvalidOperationException("Native fixture input was rejected");
+  }
   [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int command);
   [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr h, IntPtr dc, uint flags);
 }
@@ -61,9 +72,29 @@ if ($Mode -ne 'inspect') {
   $null = [DesktopWindow]::SetForegroundWindow($handle)
   $shell = New-Object -ComObject WScript.Shell
   if (!$shell.AppActivate($ProcessId)) { throw 'Could not activate native window' }
-  Start-Sleep -Milliseconds 250
-  $keys = @{ controls = '^+d'; fullscreen = '{F11}'; zoom = '^0' }
-  $shell.SendKeys($keys[$Mode])
+  # AppActivate can report success before foreground transfer finishes. Verify
+  # the real OS target, then keep modifiers held while WebView2 handles the key.
+  # This uses the same native accelerator as a person, never a JS/native command.
+  $foregroundProcess = [uint32]0
+  for ($attempt = 0; $attempt -lt 20; $attempt++) {
+    $null = [DesktopWindow]::GetWindowThreadProcessId([DesktopWindow]::GetForegroundWindow(), [ref]$foregroundProcess)
+    if ($foregroundProcess -eq $ProcessId) { break }
+    Start-Sleep -Milliseconds 100
+  }
+  if ($foregroundProcess -ne $ProcessId) { throw 'The tested application did not become the foreground input target' }
+  $keys = switch ($Mode) { controls { @(0x11, 0x10, 0x44) }; fullscreen { @(0x7A) }; zoom { @(0x11, 0x30) } }
+  $pressed = @()
+  try {
+    foreach ($key in $keys) {
+      [DesktopWindow]::Key([uint16]$key, $false)
+      $pressed += $key
+      Start-Sleep -Milliseconds 100
+    }
+    Start-Sleep -Milliseconds 400
+  } finally {
+    [array]::Reverse($pressed)
+    foreach ($key in $pressed) { [DesktopWindow]::Key([uint16]$key, $true) }
+  }
   exit 0
 }
 $rect = New-Object DesktopWindow+Rect
