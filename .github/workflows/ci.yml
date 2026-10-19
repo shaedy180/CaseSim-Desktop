@@ -137,16 +137,14 @@ jobs:
           $installer = Get-Item -LiteralPath "src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/CaseSim_${version}_x64-setup.exe"
           $sha = git rev-parse HEAD
           if ($sha -ne $env:BUILD_SHA) { throw 'Build revision mismatch' }
-          Copy-Item -LiteralPath $installer.FullName -Destination artifacts/desktop/CaseSim-Desktop-Setup.exe
-          $hash = (Get-FileHash artifacts/desktop/CaseSim-Desktop-Setup.exe -Algorithm SHA256).Hash.ToLower()
+          $hash = (Get-FileHash -LiteralPath $installer.FullName -Algorithm SHA256).Hash.ToLower()
           @{ commit = $sha; version = $version; installer_sha256 = $hash; installer_bytes = $installer.Length; run = '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'; unsigned = $true } | ConvertTo-Json | Set-Content artifacts/desktop/build-info.json
-          "$hash  CaseSim-Desktop-Setup.exe" | Set-Content artifacts/desktop/SHA256SUMS.txt
-      - name: Upload unsigned public preview installer
+          "$hash  $($installer.Name)" | Set-Content artifacts/desktop/SHA256SUMS.txt
+      - name: Upload public validation metadata without an installer
         uses: actions/upload-artifact@v7
         with:
           name: CaseSim-Desktop-Windows-x64
           path: |
-            artifacts/desktop/CaseSim-Desktop-Setup.exe
             artifacts/desktop/build-info.json
             artifacts/desktop/SHA256SUMS.txt
           if-no-files-found: error

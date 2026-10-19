@@ -66,7 +66,7 @@ No URLs, arguments, credentials or session data are logged.
 #### Native updates and restart protection
 
 The official Tauri 2 updater runs in Rust. Checks are manual, serialized with
-download/installation, use HTTPS including redirects, an embedded public key,
+download/installation, use HTTPS with redirects rejected, an embedded public key,
 version-bound Ed25519 signatures and the default strictly-newer version comparator.
 The package source must match an explicitly allowed HTTPS origin. Download progress
 and clear connection/signature/install errors appear in local Desktop controls.
@@ -85,6 +85,31 @@ Window state is saved before the installer runs and controlled restart begins.
 `src-tauri/update-channel.json` pins the public verification key, manifest
 `https://releases.shaedy.de/casesim/windows/latest.json` and the sole download origin
 `https://releases.shaedy.de`. Never embed private repository credentials.
+
+Every release page, manifest and package requires shaedy-auth. A manual update
+check opens the system browser for login and explicit download consent. The Rust
+client generates a random PKCE S256 verifier/state and binds an ephemeral
+127.0.0.1-only callback before opening the browser. It validates the callback's
+method, exact path, Host and unique state/code, rejects oversized/invalid requests
+and stops waiting after five minutes. The code is exchanged only at the fixed
+HTTPS auth origin; no redirect is followed. Neither browser nor WebView2 cookies
+are read, copied or attached to requests. The two profiles can sign in independently.
+
+The narrow bearer grant lasts at most ten minutes, stays only in native memory,
+and is sent in a sensitive Authorization header for both the manifest and package.
+The token, verifier and code never cross IPC or enter diagnostics. No refresh token
+or embedded client secret exists. The release server rechecks the issuing user's
+active session on every request: signing out, password changes/resets, expiry or
+revocation blocks further downloads. An already admitted stream may finish.
+Expired grants require a fresh manual check/login. A verified downloaded package
+can still be installed after its download grant expires. Signature verification
+and explicit game-exit/install confirmations remain mandatory.
+
+The server uses private/no-store caching. No public feed or static machine bypass
+is provided. Redirects are rejected on manifest, download and token exchange so
+neither bearer nor verifier can reach a different URL. Direct browser downloads
+use that browser's ordinary shaedy-auth session. Until authenticated hosting and
+the corresponding auth service are deployed, update checks fail closed.
 
 The owner authorized this standalone public native repository on 2026-10-19.
 Only native source, bundled local pages, icons, the licensed font and isolated test
@@ -152,12 +177,13 @@ The PR tests the merge tree; main verifies the unexpired successful receipt, ide
 tree and both merge parents without rebuilding. Main verification cannot skip a
 failed native test. Manual CI is available for pre-PR diagnostics, not merge bypass.
 
-Download unsigned previews from **CI** > **CaseSim-Desktop-Windows-x64** (14-day
-artifact), verify `SHA256SUMS.txt` and `build-info.json`, then run
-`CaseSim-Desktop-Setup.exe`. They are public review artifacts, not official updates.
-Diagnostics use synthetic content only. The inherited signed-release controls-window
-check has failed twice in the former private preparation; extraction does not claim
-to fix that check, and official publication remains blocked until it passes.
+Public CI builds and installs unsigned previews for isolated validation, but uploads
+only build metadata, checksums and synthetic diagnostics (14-day retention). It
+does not distribute installers or provide a public download bypass. Official signed
+packages are available only through authenticated releases.shaedy.de. Public source
+can still be built independently. Desktop 22.7.52 passed the installed controls-window
+fixture in both public CI and private signed preparation; it was staged privately
+and its publication was cancelled before the authenticated transport change.
 
 Before public release, owner checks still include real
 login/logout/revocation/password changes, gameplay/PixiJS/3D/realtime, multiple DPI

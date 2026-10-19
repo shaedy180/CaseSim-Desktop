@@ -37,7 +37,10 @@ or unsupported performance claims during extraction. Keep installer/font/depende
 attribution. Record consumers before removals; preserve useful security regressions.
 
 Public CI builds only this public project, without secrets or private checkouts.
-Preview installers are unsigned. Official private release preparation verifies exact
+Preview installers are unsigned and stay on the runner; upload only metadata and
+synthetic diagnostics. Official downloads require shaedy-auth browser sessions or
+short-lived session-bound native grants. Never add static secrets, anonymous feeds,
+remote IPC or an authentication bypass. Official private release preparation verifies exact
 Desktop main CI plus approved CaseSim compatibility identity, signs and retests the
 installed package, then stages it. desktop-releases retains separate protected human
 approval and promote-only capability. Never approve on the owner's behalf. Never
