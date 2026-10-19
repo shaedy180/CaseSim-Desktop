@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "recovery",
+  "description": "Only the bundled recovery page can retry the fixed online application.",
+  "local": true,
+  "windows": ["main"],
+  "permissions": ["allow-connect"]
+}

@@ -1,0 +1,134 @@
+[
+  {
+    "version": "22.7.52",
+    "date": "2026-10-19",
+    "sections": [
+      {
+        "title": "Independent desktop previews",
+        "notes": [
+          "The native desktop shell now has public source and independently verified Windows previews.",
+          "Official updates continue to require a signed package and release approval."
+        ]
+      }
+    ]
+  },
+  {
+    "sections": [
+      {
+        "title": "Signed desktop releases",
+        "notes": [
+          "Desktop updates are delivered securely from releases.shaedy.de.",
+          "Publishing preserves previous downloads and requires a separate release approval."
+        ]
+      }
+    ],
+    "version": "22.7.51",
+    "date": "2026-10-19"
+  },
+  {
+    "version": "22.7.50",
+    "date": "2026-10-19",
+    "sections": [
+      {
+        "title": "Windows keyboard controls",
+        "notes": [
+          "Desktop shortcuts remain available without a menu bar.",
+          "Holding a shortcut no longer repeatedly toggles fullscreen.",
+          "Account access and desktop controls stay accessible from the game."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "22.7.49",
+    "date": "2026-10-19",
+    "sections": [
+      {
+        "title": "Desktop controls and secure updates",
+        "notes": [
+          "The game window keeps its native title bar without an extra menu strip.",
+          "Use desktop controls for account access, fullscreen, zoom reset and signed updates.",
+          "Updates wait until you leave the game and explicitly confirm installation.",
+          "Desktop releases now use their own version and preserve local recovery and account sessions."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "22.7.48",
+    "date": "2026-10-18",
+    "sections": [
+      {
+        "title": "Desktop account access",
+        "notes": [
+          "Open account settings and sign out from the desktop menu.",
+          "Return directly to CaseSim after managing your account."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "22.7.47",
+    "date": "2026-10-18",
+    "sections": [
+      {
+        "title": "Windows desktop preview",
+        "notes": [
+          "Improved Windows preview installer packaging."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "22.7.46",
+    "date": "2026-10-18",
+    "sections": [
+      {
+        "title": "Windows desktop preview",
+        "notes": [
+          "Strengthened checks for offline startup and reconnecting without an app restart."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "22.7.45",
+    "date": "2026-10-18",
+    "sections": [
+      {
+        "title": "Windows desktop preview",
+        "notes": [
+          "Improved validation of account navigation and connection recovery in the Windows preview."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "22.7.44",
+    "date": "2026-10-18",
+    "sections": [
+      {
+        "title": "Windows desktop preview",
+        "notes": [
+          "Improved desktop startup and connection recovery.",
+          "The initial window fits the available display area.",
+          "The Windows preview includes license information for bundled components."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "22.7.43",
+    "date": "2026-10-18",
+    "sections": [
+      {
+        "title": "Windows desktop preview",
+        "notes": [
+          "Try CaseSim in a native Windows app with your existing account.",
+          "Your desktop session and window layout are remembered between launches.",
+          "Connection failures offer a retry without restarting the app."
+        ]
+      }
+    ]
+  }
+]
