@@ -177,6 +177,8 @@ The PR tests the merge tree; main verifies the unexpired successful receipt, ide
 tree and both merge parents without rebuilding. Main verification cannot skip a
 failed native test. Manual CI is available for pre-PR diagnostics, not merge bypass.
 
+PR validation receipts are kept for 14 days and plain CI build artifacts for 7 days (`retention-days` in the workflows). Merge within 14 days of the last green PR run, otherwise rerun the complete PR workflow first.
+
 Public CI builds and installs unsigned previews for isolated validation, but uploads
 only build metadata, checksums and synthetic diagnostics (14-day retention). It
 does not distribute installers or provide a public download bypass. Official signed
