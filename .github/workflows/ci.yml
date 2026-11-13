@@ -202,4 +202,4 @@ jobs:
           name: ${{ steps.receipt.outputs.artifact }}
           path: ci-validation.json
           if-no-files-found: error
-          retention-days: 90
+          retention-days: 14
